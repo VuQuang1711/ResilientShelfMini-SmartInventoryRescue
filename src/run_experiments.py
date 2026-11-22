@@ -7,20 +7,22 @@ Chạy thực nghiệm đầy đủ (STEP 4 + STEP 6 + STEP 7) trên dữ liệu
 - Tất cả thuật toán CHỈ tối ưu trên nhu cầu dự báo (demand_forecast.csv),
   sau đó đánh giá công bằng trên 07 ngày kiểm tra thực tế (demand_actual_test.csv).
 
-Đầu ra tự động sinh tại results/:
-- baseline_summary.csv   (No Transfer & Greedy)
-- kla_summary.csv        (KLA qua các seeds)
-- kla_ls_summary.csv     (KLA-LS qua các seeds)
-- summary.csv            (Bảng tổng hợp đầy đủ mọi lần chạy theo chuẩn STEP 7.4)
-- transfers_greedy.csv   (Lệnh điều chuyển chi tiết của Greedy)
-- transfers_kla.csv      (Lệnh điều chuyển chi tiết của KLA - seed tốt nhất)
-- transfers_kla_ls.csv   (Lệnh điều chuyển chi tiết của KLA-LS - seed tốt nhất)
-- kla_convergence.csv    (Lịch sử hội tụ KLA vs KLA-LS theo vòng lặp)
-- experiment_log.md      (Nhật ký lần chạy mới nhất, có mã run_01, run_02, ...)
-- logs/run_XX.md         (Lưu trữ riêng từng lần chạy: run_01.md, run_02.md, ..., run_100.md)
-- compare_cost.png       (Biểu đồ cột so sánh tổng chi phí theo phương pháp & kịch bản)
-- compare_service.png    (Biểu đồ lượng thiếu hàng & Fill Rate theo kịch bản)
-- convergence_kla.png    (Biểu đồ hội tụ KLA vs KLA-LS)
+Đầu ra tự động sinh tại results/ (đúng yêu cầu giảng viên) và results/SummaryForDemo/ (cho App Demo):
+- results/summary.csv                         (Bảng tổng hợp đầy đủ mọi lần chạy theo chuẩn STEP 7.4)
+- results/baseline_summary.csv                (No Transfer & Greedy — STEP 4)
+- results/kla_summary.csv                     (KLA qua các seeds — STEP 6)
+- results/kla_ls_summary.csv                  (KLA-LS qua các seeds — STEP 6)
+- results/transfers_greedy.csv                (Lệnh điều chuyển chi tiết của Greedy — STEP 4)
+- results/kla_convergence.csv                 (Lịch sử hội tụ KLA vs KLA-LS làm nguồn vẽ biểu đồ)
+- results/SummaryForDemo/summary.csv          (Bản đồng bộ phục vụ Demo Streamlit)
+- results/SummaryForDemo/transfers_greedy.csv (Bản đồng bộ phục vụ Demo Streamlit)
+- results/SummaryForDemo/transfers_kla.csv    (Lệnh điều chuyển KLA - seed tốt nhất cho Demo)
+- results/SummaryForDemo/transfers_kla_ls.csv (Lệnh điều chuyển KLA-LS - seed tốt nhất cho Demo)
+- results/experiment_log.md                   (Nhật ký lần chạy mới nhất, có mã run_01, run_02, ...)
+- results/logs/run_XX.md                      (Lưu trữ riêng từng lần chạy: run_01.md, run_02.md, ..., run_100.md)
+- results/compare_cost.png                    (Biểu đồ cột so sánh tổng chi phí theo phương pháp & kịch bản)
+- results/compare_service.png                 (Biểu đồ lượng thiếu hàng & Fill Rate theo kịch bản)
+- results/convergence_kla.png                 (Biểu đồ hội tụ KLA vs KLA-LS)
 """
 
 from __future__ import annotations
@@ -53,6 +55,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 RESULTS_DIR = PROJECT_ROOT / "results"
 LOGS_DIR = RESULTS_DIR / "logs"
+DEMO_DIR = RESULTS_DIR / "SummaryForDemo"
 
 SCENARIOS = ["NORMAL", "FLASH_SALE", "SURGE"]
 SEEDS = [42, 43, 44, 45, 46]
@@ -231,6 +234,7 @@ def main() -> int:
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    DEMO_DIR.mkdir(parents=True, exist_ok=True)
     run_num, run_id = _get_next_run_id(RESULTS_DIR)
     started_at = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[INFO] Bắt đầu thực nghiệm lần chạy: {run_id} (Lần thứ {run_num})")
@@ -317,9 +321,12 @@ def main() -> int:
         print(f"  - KLA (5s)    : mean_cost={kla_mean:.2f} USD")
         print(f"  - KLA-LS (5s) : mean_cost={klals_mean:.2f} USD")
 
-    # Lưu tất cả các file CSV kết quả
+    # Lưu tất cả các file CSV kết quả:
+    # - results/: đúng chuẩn yêu cầu giảng viên (không dư file chỉ dùng cho Demo)
+    # - results/SummaryForDemo/: đầy đủ các file CSV phục vụ trực tiếp cho App Streamlit
     summary_df = pd.DataFrame(all_records)
     summary_df.to_csv(RESULTS_DIR / "summary.csv", index=False)
+    summary_df.to_csv(DEMO_DIR / "summary.csv", index=False)
 
     baseline_df = summary_df[summary_df["method"].isin(["No Transfer", "Greedy"])]
     baseline_df.to_csv(RESULTS_DIR / "baseline_summary.csv", index=False)
@@ -327,9 +334,12 @@ def main() -> int:
     summary_df[summary_df["method"] == "KLA"].to_csv(RESULTS_DIR / "kla_summary.csv", index=False)
     summary_df[summary_df["method"] == "KLA-LS"].to_csv(RESULTS_DIR / "kla_ls_summary.csv", index=False)
 
-    pd.concat(greedy_transfer_dfs, ignore_index=True).to_csv(RESULTS_DIR / "transfers_greedy.csv", index=False)
-    pd.concat(kla_transfer_dfs, ignore_index=True).to_csv(RESULTS_DIR / "transfers_kla.csv", index=False)
-    pd.concat(kla_ls_transfer_dfs, ignore_index=True).to_csv(RESULTS_DIR / "transfers_kla_ls.csv", index=False)
+    greedy_transfers_df = pd.concat(greedy_transfer_dfs, ignore_index=True)
+    greedy_transfers_df.to_csv(RESULTS_DIR / "transfers_greedy.csv", index=False)
+    greedy_transfers_df.to_csv(DEMO_DIR / "transfers_greedy.csv", index=False)
+
+    pd.concat(kla_transfer_dfs, ignore_index=True).to_csv(DEMO_DIR / "transfers_kla.csv", index=False)
+    pd.concat(kla_ls_transfer_dfs, ignore_index=True).to_csv(DEMO_DIR / "transfers_kla_ls.csv", index=False)
 
     conv_df = pd.DataFrame(conv_rows)
     conv_df.to_csv(RESULTS_DIR / "kla_convergence.csv", index=False)

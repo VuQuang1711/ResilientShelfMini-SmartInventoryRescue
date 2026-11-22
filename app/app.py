@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
 DATA_DIR = PROJECT_ROOT / "data"
 RESULTS_DIR = PROJECT_ROOT / "results"
+DEMO_DIR = RESULTS_DIR / "SummaryForDemo"
 
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
@@ -109,12 +110,14 @@ if run_mode == "Chạy tối ưu trực tiếp (Live)":
 
 # Nạp bài toán cho kịch bản đã chọn
 instance = load_problem_instance(DATA_DIR, selected_scenario)
-summary_path = RESULTS_DIR / "summary.csv"
+summary_path = DEMO_DIR / "summary.csv"
+if not summary_path.exists() or summary_path.stat().st_size == 0:
+    summary_path = RESULTS_DIR / "summary.csv"
 
 # Thực hiện tính toán hoặc nạp kết quả đã tính trước
 if run_mode == "Chạy tối ưu trực tiếp (Live)" or not summary_path.exists() or summary_path.stat().st_size == 0:
     if run_mode != "Chạy tối ưu trực tiếp (Live)":
-        st.info("Chưa tìm thấy `results/summary.csv` nên hệ thống đang tự chạy trực tiếp cho kịch bản hiện tại.")
+        st.info("Chưa tìm thấy `results/SummaryForDemo/summary.csv` nên hệ thống đang tự chạy trực tiếp cho kịch bản hiện tại.")
 
     x_none = no_transfer_plan(instance)
     x_greedy, info_g = solve_greedy(instance)
@@ -168,12 +171,12 @@ else:
     comp_df["_ord"] = comp_df["method"].map(order_map).fillna(99)
     comp_df = comp_df.sort_values("_ord").drop(columns="_ord").reset_index(drop=True)
 
-    # Khôi phục ma trận lệnh điều chuyển đã tính trước cho phương pháp đang chọn
+    # Khôi phục ma trận lệnh điều chuyển đã tính trước từ results/SummaryForDemo/
     x_none = no_transfer_plan(instance)
     file_map = {
-        "Greedy": RESULTS_DIR / "transfers_greedy.csv",
-        "KLA": RESULTS_DIR / "transfers_kla.csv",
-        "KLA-LS": RESULTS_DIR / "transfers_kla_ls.csv",
+        "Greedy": DEMO_DIR / "transfers_greedy.csv",
+        "KLA": DEMO_DIR / "transfers_kla.csv",
+        "KLA-LS": DEMO_DIR / "transfers_kla_ls.csv",
     }
     chosen_x = no_transfer_plan(instance)
     transfers_df = transfers_to_dataframe(chosen_x, instance, selected_method)
@@ -187,7 +190,7 @@ else:
 
     sim_chosen = simulate_7_days(chosen_x, instance, use_actual=True)
     sim_none = simulate_7_days(x_none, instance, use_actual=True)
-    mode_badge = "Chế độ: **Kịch bản đã tính trước từ `results/summary.csv`** (biểu đồ so sánh hiển thị trung bình 5 seeds; 4 thẻ KPI & bảng lệnh hiển thị nghiệm tốt nhất theo hàm mục tiêu dự báo)"
+    mode_badge = "Chế độ: **Kịch bản đã tính trước từ `results/SummaryForDemo/`** (biểu đồ so sánh hiển thị trung bình 5 seeds; 4 thẻ KPI & bảng lệnh hiển thị nghiệm tốt nhất theo hàm mục tiêu dự báo)"
 
 st.markdown(mode_badge)
 
