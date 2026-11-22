@@ -16,7 +16,8 @@ Chạy thực nghiệm đầy đủ (STEP 4 + STEP 6 + STEP 7) trên dữ liệu
 - transfers_kla.csv      (Lệnh điều chuyển chi tiết của KLA - seed tốt nhất)
 - transfers_kla_ls.csv   (Lệnh điều chuyển chi tiết của KLA-LS - seed tốt nhất)
 - kla_convergence.csv    (Lịch sử hội tụ KLA vs KLA-LS theo vòng lặp)
-- experiment_log.md      (Nhật ký chạy đầy đủ cấu hình, seed, thời gian)
+- experiment_log.md      (Nhật ký lần chạy mới nhất, có mã run_01, run_02, ...)
+- logs/run_XX.md         (Lưu trữ riêng từng lần chạy: run_01.md, run_02.md, ..., run_100.md)
 - compare_cost.png       (Biểu đồ cột so sánh tổng chi phí theo phương pháp & kịch bản)
 - compare_service.png    (Biểu đồ lượng thiếu hàng & Fill Rate theo kịch bản)
 - convergence_kla.png    (Biểu đồ hội tụ KLA vs KLA-LS)
@@ -25,9 +26,10 @@ Chạy thực nghiệm đầy đủ (STEP 4 + STEP 6 + STEP 7) trên dữ liệu
 from __future__ import annotations
 
 import datetime as dt
+import re
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import matplotlib
 matplotlib.use("Agg")
@@ -50,6 +52,7 @@ from simulator import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 RESULTS_DIR = PROJECT_ROOT / "results"
+LOGS_DIR = RESULTS_DIR / "logs"
 
 SCENARIOS = ["NORMAL", "FLASH_SALE", "SURGE"]
 SEEDS = [42, 43, 44, 45, 46]
@@ -57,6 +60,27 @@ KLA_POP_SIZE = 15
 KLA_MAX_ITER = 35
 KLA_LS_EVERY = 10
 METHODS_ORDER = ["No Transfer", "Greedy", "KLA", "KLA-LS"]
+
+
+def _get_next_run_id(results_dir: Path = RESULTS_DIR) -> Tuple[int, str]:
+    """Tự động xác định số thứ tự lần chạy tiếp theo: run_01, run_02, ..., run_50, run_100."""
+    max_run = 0
+    logs_dir = results_dir / "logs"
+    if logs_dir.exists():
+        for log_file in logs_dir.glob("run_*.md"):
+            m = re.match(r"^run_(\d+)\.md$", log_file.name)
+            if m:
+                max_run = max(max_run, int(m.group(1)))
+
+    latest_log = results_dir / "experiment_log.md"
+    if latest_log.exists():
+        head = latest_log.read_text(encoding="utf-8")[:500]
+        m = re.search(r"\brun_(\d+)\b", head)
+        if m:
+            max_run = max(max_run, int(m.group(1)))
+
+    next_num = max_run + 1
+    return next_num, f"run_{next_num:02d}"
 
 
 def _build_record(
@@ -206,7 +230,10 @@ def main() -> int:
             )
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    run_num, run_id = _get_next_run_id(RESULTS_DIR)
     started_at = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[INFO] Bắt đầu thực nghiệm lần chạy: {run_id} (Lần thứ {run_num})")
 
     all_records: List[Dict[str, object]] = []
     greedy_transfer_dfs: List[pd.DataFrame] = []
@@ -214,8 +241,9 @@ def main() -> int:
     kla_ls_transfer_dfs: List[pd.DataFrame] = []
     conv_rows: List[Dict[str, object]] = []
     log_lines: List[str] = [
-        "# Nhật ký Chạy Thực nghiệm — Team Chuyển Kho (HUIT DSC 2026)",
+        f"# Nhật ký Chạy Thực nghiệm [{run_id}] — Team Chuyển Kho (HUIT DSC 2026)",
         "",
+        f"- **Lần chạy (Run ID):** `{run_id}` (Lần thứ {run_num})",
         f"- **Thời gian chạy:** `{started_at}`",
         f"- **Kịch bản:** `{SCENARIOS}`",
         f"- **Cấu hình KLA:** `pop_size={KLA_POP_SIZE}, max_iter={KLA_MAX_ITER}, seeds={SEEDS}`",
@@ -333,9 +361,13 @@ def main() -> int:
     log_lines.append("```text")
     log_lines.append(summary_df.to_string(index=False))
     log_lines.append("```")
-    (RESULTS_DIR / "experiment_log.md").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+    log_content = "\n".join(log_lines) + "\n"
+    run_log_path = LOGS_DIR / f"{run_id}.md"
+    run_log_path.write_text(log_content, encoding="utf-8")
+    (RESULTS_DIR / "experiment_log.md").write_text(log_content, encoding="utf-8")
 
-    print("\n[DONE] Đã hoàn tất thực nghiệm và lưu toàn bộ CSV, log, biểu đồ vào thư mục results/.")
+    print(f"\n[DONE] Hoàn tất lần chạy {run_id}! Đã lưu log riêng tại: results/logs/{run_id}.md")
+    print("       Đã cập nhật bản mới nhất tại: results/experiment_log.md và toàn bộ CSV/PNG trong results/.")
     print("[NEXT] Khởi chạy demo Streamlit: py -m streamlit run app/app.py")
     return 0
 
