@@ -11,6 +11,7 @@ docs/*.zip
 
 # Hệ điều hành / IDE
 .DS_Store
+__MACOSX/
 Thumbs.db
 .vscode/
 .idea/
